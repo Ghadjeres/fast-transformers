@@ -148,57 +148,57 @@ class RecurrentTransformerEncoderLayer(Module):
 #         return self.norm2(x+y), state
 
 
-# class RecurrentTransformerEncoder(Module):
-#     """RecurrentTransformerEncoder is a sequence of
-#     RecurrentTransformerEncoderLayer instances.
+class RecurrentTransformerEncoder(Module):
+    """RecurrentTransformerEncoder is a sequence of
+    RecurrentTransformerEncoderLayer instances.
 
-#     RecurrentTransformerEncoder keeps a separate state per
-#     RecurrentTransformerEncoderLayer.
+    RecurrentTransformerEncoder keeps a separate state per
+    RecurrentTransformerEncoderLayer.
 
-#     Arguments
-#     ---------
-#         layers: list, RecurrentTransformerEncoderLayer instances or instances
-#                 that implement the same interface
-#         norm_layer: A normalization layer to be applied to the final output
-#                     (default: None which means no normalization)
-#         event_dispatcher: str or EventDispatcher instance to be used by this
-#                           module for dispatching events (default: the default
-#                           global dispatcher)
-#     """
-#     def __init__(self, layers, norm_layer=None, event_dispatcher=""):
-#         super(RecurrentTransformerEncoder, self).__init__()
-#         self.layers = ModuleList(layers)
-#         self.norm = norm_layer
-#         self.event_dispatcher = EventDispatcher.get(event_dispatcher)
+    Arguments
+    ---------
+        layers: list, RecurrentTransformerEncoderLayer instances or instances
+                that implement the same interface
+        norm_layer: A normalization layer to be applied to the final output
+                    (default: None which means no normalization)
+        event_dispatcher: str or EventDispatcher instance to be used by this
+                          module for dispatching events (default: the default
+                          global dispatcher)
+    """
+    def __init__(self, layers, norm_layer=None, event_dispatcher=""):
+        super(RecurrentTransformerEncoder, self).__init__()
+        self.layers = ModuleList(layers)
+        self.norm = norm_layer
+        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
 
-#     def forward(self, x, state=None, memory=None):
-#         """Apply all recurrent transformer layers to the input x using the
-#         provided state.
+    def forward(self, x, state=None, memory=None):
+        """Apply all recurrent transformer layers to the input x using the
+        provided state.
 
-#         Arguments
-#         ---------
-#             x: The input features of shape (N, E) where N is the batch size and
-#                E is d_model passed in the constructor of each recurrent
-#                transformer encoder layer
-#             state: A list of objects to be passed to each recurrent
-#                    transformer encoder layer
-#             memory: **Deprecated** name for the state argument
-#         """
-#         # Initialize the memory to None if not given
-#         state = check_state(state, memory)
-#         if state is None:
-#             state = [None]*len(self.layers)
+        Arguments
+        ---------
+            x: The input features of shape (N, E) where N is the batch size and
+               E is d_model passed in the constructor of each recurrent
+               transformer encoder layer
+            state: A list of objects to be passed to each recurrent
+                   transformer encoder layer
+            memory: **Deprecated** name for the state argument
+        """
+        # Initialize the memory to None if not given
+        state = check_state(state, memory)
+        if state is None:
+            state = [None]*len(self.layers)
 
-#         # Apply all the transformers
-#         for i, layer in enumerate(self.layers):
-#             x, s = layer(x, state[i])
-#             state[i] = s
+        # Apply all the transformers
+        for i, layer in enumerate(self.layers):
+            x, s = layer(x, state[i])
+            state[i] = s
 
-#         # Apply the normalization if needed
-#         if self.norm is not None:
-#             x = self.norm(x)
+        # Apply the normalization if needed
+        if self.norm is not None:
+            x = self.norm(x)
 
-#         return x, state
+        return x, state
 
 
 class RecurrentTransformerDecoderLayer(Module):
