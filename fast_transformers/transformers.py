@@ -10,6 +10,7 @@ different attention mechanisms.
 In all cases the batch dimension is first and the sequence dimension is second.
 """
 
+from fast_transformers.events import event_dispatcher
 from .gating_layers import GRUGate
 import torch
 from torch.nn import Dropout, LayerNorm, Linear, Module, ModuleList
@@ -39,7 +40,7 @@ class TransformerEncoderLayer(Module):
     """
 
     def __init__(self, attention, d_model, n_heads, d_ff=None, dropout=0.1,
-                 activation="relu"):
+                 activation="relu", event_dispatcher=""):
         super(TransformerEncoderLayer, self).__init__()
         d_ff = d_ff or 4 * d_model
         self.attention = attention
@@ -51,6 +52,7 @@ class TransformerEncoderLayer(Module):
         self.activation = F.relu if activation == "relu" else F.gelu
         self.gating1 = GRUGate(d_model)
         self.gating2 = GRUGate(d_model)
+        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
 
     def forward(self, x, attn_mask=None, length_mask=None):
         """Apply the transformer encoder to the input x.
