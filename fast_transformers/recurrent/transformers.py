@@ -47,7 +47,7 @@ class RecurrentTransformerEncoderLayer(Module):
         activation: {'relu', 'gelu'} Which activation to use for the feed
                     forward part of the layer (default: relu)
     """
-    def __init__(self, attention, d_model, n_heads, d_ff=None, dropout=0.1,
+    def __init__(self, attention, d_model, d_ff=None, dropout=0.1,
                  activation="relu", event_dispatcher=""):
         super(RecurrentTransformerEncoderLayer, self).__init__()
         d_ff = d_ff or 4*d_model
