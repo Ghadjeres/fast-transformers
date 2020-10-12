@@ -203,6 +203,90 @@ class RecurrentTransformerEncoder(Module):
         return x, state
 
 
+# class RecurrentTransformerDecoderLayer(Module):
+#     """Attention to the previous inputs and a preprocessed memory.
+
+#     This transformer decoder layer is the recurrent dual of
+#     fast_transformers.transformers.TransformerDecoderLayer . The results should
+#     be identical given the same inputs and a lower triangular mask for x_mask.
+
+#     Arguments
+#     ---------
+#         self_attention: The attention implementation to use for self attention
+#                         given as a nn.Module
+#         cross_attention: The attention implementation to use for cross
+#                          attention given as a nn.Module
+#         d_model: The input feature dimensionality
+#         d_ff: The dimensionality of the intermediate features after the
+#               attention (default: d_model*4)
+#         dropout: The dropout rate to apply to the intermediate features
+#                  (default: 0.1)
+#         activation: {'relu', 'gelu'} Which activation to use for the feed
+#                     forward part of the layer (default: relu)
+#         event_dispatcher: str or EventDispatcher instance to be used by this
+#                           module for dispatching events (default: the default
+#                           global dispatcher)
+#     """
+#     def __init__(self, self_attention, cross_attention, d_model, d_ff=None,
+#                  dropout=0.1, activation="relu", event_dispatcher=""):
+#         super(RecurrentTransformerDecoderLayer, self).__init__()
+#         d_ff = d_ff or 4*d_model
+#         self.self_attention = self_attention
+#         self.cross_attention = cross_attention
+#         self.linear1 = Linear(d_model, d_ff)
+#         self.linear2 = Linear(d_ff, d_model)
+#         self.norm1 = LayerNorm(d_model)
+#         self.norm2 = LayerNorm(d_model)
+#         self.norm3 = LayerNorm(d_model)
+#         self.dropout = Dropout(dropout)
+#         self.activation = F.relu if activation == "relu" else F.gelu
+#         self.event_dispatcher = EventDispatcher.get(event_dispatcher)
+
+#     def forward(self, x, memory, memory_length_mask=None, state=None):
+#         """Apply the transformer decoder to the input x and also attend to
+#         memory.
+
+#         Note the memory mask is assumed to be a full mask.
+
+#         Arguments
+#         ---------
+#             x: The input features of shape (N, E) where N is the batch size and
+#                E is d_model passed in the constructor
+#             memory: A sequence of features (N, S, E) that the input will attend
+#                     to. S is the sequence length and E is the same as for x.
+#             memory_length_mask: An implementation of a BaseMask that encodes
+#                                 how many elements each memory sequence in the
+#                                 batch consists of.
+#             state: The state varies depending on the attention implementations
+#                    but it allows for recurrent implementation.
+#         """
+#         # Normalize the mask
+#         N = x.shape[0]
+#         L = memory.shape[1]
+#         memory_length_mask = memory_length_mask or \
+#             LengthMask(x.new_full((N,), L, dtype=torch.int64))
+
+#         # Extract the individual states for the self attention and the cross
+#         # attention
+#         self_state, cross_state = state or [None, None]
+
+#         # First apply the self attention and add it to the input
+#         x2, self_state = self.self_attention(x, x, x, state=self_state)
+#         x = self.norm1(x + self.dropout(x2))
+
+#         # Secondly apply the cross attention and add it to the previous output
+#         x2, cross_state = self.cross_attention(
+#             x, memory, memory, memory_length_mask, state=cross_state
+#         )
+#         x = self.norm2(x + self.dropout(x2))
+
+#         # Finally run the fully connected part of the layer
+#         y = x
+#         y = self.dropout(self.activation(self.linear1(y)))
+#         y = self.dropout(self.linear2(y))
+
+#         return self.norm3(x+y), [self_state, cross_state]
+
 class RecurrentTransformerDecoderLayer(Module):
     """Attention to the previous inputs and a preprocessed memory.
 
@@ -237,10 +321,15 @@ class RecurrentTransformerDecoderLayer(Module):
         self.linear2 = Linear(d_ff, d_model)
         self.norm1 = LayerNorm(d_model)
         self.norm2 = LayerNorm(d_model)
+        self.norm2bis = LayerNorm(d_model)
         self.norm3 = LayerNorm(d_model)
         self.dropout = Dropout(dropout)
         self.activation = F.relu if activation == "relu" else F.gelu
         self.event_dispatcher = EventDispatcher.get(event_dispatcher)
+        self.gating1 = GRUGate(d_model)
+        self.gating2 = GRUGate(d_model)
+        self.gating3 = GRUGate(d_model)
+
 
     def forward(self, x, memory, memory_length_mask=None, state=None):
         """Apply the transformer decoder to the input x and also attend to
@@ -271,22 +360,25 @@ class RecurrentTransformerDecoderLayer(Module):
         self_state, cross_state = state or [None, None]
 
         # First apply the self attention and add it to the input
-        x2, self_state = self.self_attention(x, x, x, state=self_state)
-        x = self.norm1(x + self.dropout(x2))
+        y = self.norm1(x)
+        x2, self_state = self.self_attention(y, y, y, state=self_state)
+        x = self.gating1(x, self.dropout(x2))
 
         # Secondly apply the cross attention and add it to the previous output
+        y = self.norm2(x)
+        memory = self.norm2bis(memory)
         x2, cross_state = self.cross_attention(
-            x, memory, memory, memory_length_mask, state=cross_state
+            y, memory, memory, memory_length_mask, state=cross_state
         )
-        x = self.norm2(x + self.dropout(x2))
+        x = self.gating2(x, self.dropout(x2))
 
         # Finally run the fully connected part of the layer
-        y = x
+        y = self.norm3(x)
         y = self.dropout(self.activation(self.linear1(y)))
         y = self.dropout(self.linear2(y))
+        x = self.gating3(x, y)
 
-        return self.norm3(x+y), [self_state, cross_state]
-
+        return x, [self_state, cross_state]
 
 class RecurrentTransformerDecoder(Module):
     """RecurrentTransformerDecoder is little more than a sequence of

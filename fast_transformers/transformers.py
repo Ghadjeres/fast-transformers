@@ -220,6 +220,106 @@ class TransformerEncoder(Module):
         return x
 
 
+# class TransformerDecoderLayer(Module):
+#     """The decoder layer from "Attention Is All You Need".
+
+#     Similar to the encoder layer, this layer implements the decoder that
+#     PyTorch implements but can be used with any attention implementation
+#     because it receives the attention layers as constructor arguments.
+
+#     Arguments
+#     ---------
+#         self_attention: The attention implementation to use for self attention
+#                         given as a nn.Module
+#         cross_attention: The attention implementation to use for cross
+#                          attention given as a nn.Module
+#         d_model: The input feature dimensionality
+#         d_ff: The dimensionality of the intermediate features after the
+#               attention (default: d_model*4)
+#         dropout: The dropout rate to apply to the intermediate features
+#                  (default: 0.1)
+#         activation: {'relu', 'gelu'} Which activation to use for the feed
+#                     forward part of the layer (default: relu)
+#         event_dispatcher: str or EventDispatcher instance to be used by this
+#                           module for dispatching events (default: the default
+#                           global dispatcher)
+#     """
+#     def __init__(self, self_attention, cross_attention, d_model, d_ff=None,
+#                  dropout=0.1, activation="relu", event_dispatcher=""):
+#         super(TransformerDecoderLayer, self).__init__()
+#         d_ff = d_ff or 4*d_model
+#         self.self_attention = self_attention
+#         self.cross_attention = cross_attention
+#         self.linear1 = Linear(d_model, d_ff)
+#         self.linear2 = Linear(d_ff, d_model)
+#         self.norm1 = LayerNorm(d_model)
+#         self.norm2 = LayerNorm(d_model)
+#         self.norm3 = LayerNorm(d_model)
+#         self.dropout = Dropout(dropout)
+#         self.activation = F.relu if activation == "relu" else F.gelu
+#         self.event_dispatcher = EventDispatcher.get(event_dispatcher)
+
+#     def forward(self, x, memory, x_mask=None, x_length_mask=None,
+#                 memory_mask=None, memory_length_mask=None):
+#         """Apply the transformer decoder to the input x using the memory
+#         `memory`.
+
+#         Arguments
+#         ---------
+#             x: The input features of shape (N, L, E) where N is the batch size,
+#                L is the sequence length (padded) and E should be the same as
+#                the d_model passed in the constructor.
+#             memory: The memory features of shape (N, L', E) where N is the
+#                     batch size, L' is the memory's sequence length (padded) and
+#                     E should be the same as the d_model.
+#             x_mask: An implementation of fast_transformers.masking.BaseMask
+#                     that encodes where each element of x can attend to in x.
+#                     Namely the self attention mask.
+#             x_length_mask: An implementation of a BaseMask that encodes how
+#                            many elements each sequence in the batch consists
+#                            of.
+#             memory_mask: An implementation of BaseMask that encodes where each
+#                          element of x can attend to in the memory. Namely the
+#                          cross attention mask.
+#             memory_length_mask: An implementation of a BaseMask that encodes how
+#                                 many elements each memory sequence in the batch
+#                                 consists of.
+#         """
+#         # Normalize the masks
+#         N = x.shape[0]
+#         L = x.shape[1]
+#         L_prime = memory.shape[1]
+#         x_mask = x_mask or FullMask(L, device=x.device)
+#         x_length_mask = x_length_mask  or \
+#             LengthMask(x.new_full((N,), L, dtype=torch.int64))
+#         memory_mask = memory_mask or FullMask(L, L_prime, device=x.device)
+#         memory_length_mask = memory_length_mask or \
+#             LengthMask(x.new_full((N,), L_prime, dtype=torch.int64))
+
+#         # First apply the self attention and add it to the input
+#         x = x + self.dropout(self.self_attention(
+#             x, x, x,
+#             attn_mask=x_mask,
+#             query_lengths=x_length_mask,
+#             key_lengths=x_length_mask
+#         ))
+#         x = self.norm1(x)
+
+#         # Secondly apply the cross attention and add it to the previous output
+#         x = x + self.dropout(self.cross_attention(
+#             x, memory, memory,
+#             attn_mask=memory_mask,
+#             query_lengths=x_length_mask,
+#             key_lengths=memory_length_mask
+#         ))
+
+#         # Finally run the fully connected part of the layer
+#         y = x = self.norm2(x)
+#         y = self.dropout(self.activation(self.linear1(y)))
+#         y = self.dropout(self.linear2(y))
+
+#         return self.norm3(x+y)
+
 class TransformerDecoderLayer(Module):
     """The decoder layer from "Attention Is All You Need".
 
@@ -254,10 +354,14 @@ class TransformerDecoderLayer(Module):
         self.linear2 = Linear(d_ff, d_model)
         self.norm1 = LayerNorm(d_model)
         self.norm2 = LayerNorm(d_model)
+        self.norm2bis = LayerNorm(d_model)
         self.norm3 = LayerNorm(d_model)
         self.dropout = Dropout(dropout)
         self.activation = F.relu if activation == "relu" else F.gelu
         self.event_dispatcher = EventDispatcher.get(event_dispatcher)
+        self.gating1 = GRUGate(d_model)
+        self.gating2 = GRUGate(d_model)
+        self.gating3 = GRUGate(d_model)
 
     def forward(self, x, memory, x_mask=None, x_length_mask=None,
                 memory_mask=None, memory_length_mask=None):
@@ -297,28 +401,36 @@ class TransformerDecoderLayer(Module):
             LengthMask(x.new_full((N,), L_prime, dtype=torch.int64))
 
         # First apply the self attention and add it to the input
-        x = x + self.dropout(self.self_attention(
-            x, x, x,
-            attn_mask=x_mask,
-            query_lengths=x_length_mask,
-            key_lengths=x_length_mask
-        ))
-        x = self.norm1(x)
+        y = self.norm1(x)
+        x = self.gating1(x,
+                self.dropout(self.self_attention(
+                y, y, y,
+                attn_mask=x_mask,
+                query_lengths=x_length_mask,
+                key_lengths=x_length_mask
+            ))
+        )
+        
 
         # Secondly apply the cross attention and add it to the previous output
-        x = x + self.dropout(self.cross_attention(
-            x, memory, memory,
+        y = self.norm2(x)
+        memory = self.norm2bis(memory)
+        x = self.gating2(x, 
+        self.dropout(self.cross_attention(
+            y, memory, memory,
             attn_mask=memory_mask,
             query_lengths=x_length_mask,
             key_lengths=memory_length_mask
         ))
+        )
 
         # Finally run the fully connected part of the layer
-        y = x = self.norm2(x)
+        y = self.norm3(x)
         y = self.dropout(self.activation(self.linear1(y)))
         y = self.dropout(self.linear2(y))
 
-        return self.norm3(x+y)
+        x = self.gating3(x, y)
+        return x
 
 
 class TransformerDecoder(Module):
