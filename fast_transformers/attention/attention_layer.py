@@ -111,3 +111,57 @@ class AttentionLayer(Module):
 
         # Project the output and return
         return self.out_projection(new_values)
+
+class EmptyAttentionLayer(Module):
+    """
+    Returns values
+
+    Arguments
+    ---------
+        attention: Specific inner attention implementation that just computes a
+                   weighted average of values given a similarity of queries and
+                   keys.
+        d_model: The input feature dimensionality
+        n_heads: The number of heads for the multi head attention
+        d_keys: The dimensionality of the keys/queries
+                (default: d_model/n_heads)
+        d_values: The dimensionality of the values (default: d_model/n_heads)
+        event_dispatcher: str or EventDispatcher instance to be used by this
+                          module for dispatching events (default: the default
+                          global dispatcher)
+    """
+    def __init__(self, attention, d_model, n_heads, d_keys=None,
+                 d_values=None, event_dispatcher=""):
+        super(EmptyAttentionLayer, self).__init__()
+
+    def forward(self, queries, keys, values, attn_mask, query_lengths,
+                key_lengths):
+        """Apply attention to the passed in queries/keys/values after
+        projecting them to multiple heads.
+
+        In the argument description we make use of the following sizes
+
+            - N: the batch size
+            - L: The maximum length of the queries
+            - S: The maximum length of the keys (the actual length per sequence
+              is given by the length mask)
+            - D: The input feature dimensionality passed in the constructor as
+              'd_model'
+
+        Arguments
+        ---------
+            queries: (N, L, D) The tensor containing the queries
+            keys: (N, S, D) The tensor containing the keys
+            values: (N, S, D) The tensor containing the values
+            attn_mask: An implementation of BaseMask that encodes where each
+                       query can attend to
+            query_lengths: An implementation of  BaseMask that encodes how
+                           many queries each sequence in the batch consists of
+            key_lengths: An implementation of BaseMask that encodes how
+                         many queries each sequence in the batch consists of
+
+        Returns
+        -------
+            The new value for each query as a tensor of shape (N, L, D).
+       """
+        return values

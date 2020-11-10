@@ -45,22 +45,23 @@ from ..attention import \
     ClusteredAttention, ImprovedClusteredAttention, \
     ReformerAttention, \
     ExactTopKAttention, ImprovedClusteredCausalAttention, \
-    ConditionalFullAttention
+    ConditionalFullAttention, DiagonalAttention
 del FullAttention, \
     LinearAttention, CausalLinearAttention, \
     ClusteredAttention, ImprovedClusteredAttention, \
     ReformerAttention, \
     ExactTopKAttention, ImprovedClusteredCausalAttention, \
-    ConditionalFullAttention
+    ConditionalFullAttention, DiagonalAttention
 
 
 from .attention_builders import \
     AttentionBuilder, \
     RecurrentAttentionBuilder, \
     RecurrentCrossAttentionBuilder
+    
 
 from .transformer_builders import \
     TransformerEncoderBuilder, \
     RecurrentEncoderBuilder, \
     TransformerDecoderBuilder, \
-    RecurrentDecoderBuilder
+    RecurrentDecoderBuilder, RecurrentDiagonalDecoderBuilder, TransformerDiagonalDecoderBuilder

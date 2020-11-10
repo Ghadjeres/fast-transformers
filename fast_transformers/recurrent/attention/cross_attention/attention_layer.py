@@ -103,3 +103,59 @@ class RecurrentCrossAttentionLayer(Module):
 
         # Project the output and return
         return self.out_projection(new_value), state
+
+# TODO CHECK
+class RecurrentDiagonalCrossAttentionLayer(Module):
+    """See fast_transformers.attention.attention_layer.AttentionLayer .
+
+    The differences with the aforementioned module as well as the
+    RecurrentAttentionLayer are that this module projects the query every time
+    and the keys and values only the first time they are provided.
+
+    Arguments
+    ---------
+        attention: Specific inner attention implementation that just computes a
+                   weighted average of values given a similarity of queries and
+                   keys.
+        d_model: The input feature dimensionality
+        n_heads: The number of heads for the multi head attention
+        d_keys: The dimensionality of the keys/queries
+                (default: d_model/n_heads)
+        d_values: The dimensionality of the values (default: d_model/n_heads)
+        event_dispatcher: str or EventDispatcher instance to be used by this
+                          module for dispatching events (default: the default
+                          global dispatcher)
+    """
+    def __init__(self, attention, d_model, n_heads, d_keys=None,
+                 d_values=None, event_dispatcher=""):
+        super(RecurrentDiagonalCrossAttentionLayer, self).__init__()
+
+    def forward(self, query, keys, values, key_lengths, state=None):
+        """Attend to the keys and values based on the passed in query.
+
+        In the argument description we make use of the following sizes
+
+            - N: the batch size
+            - S: the sequence length of the keys and values
+            - D: The input feature dimensionality passed in the constructor as
+              'd_model'
+
+        Argument
+        --------
+            query: (N, D) The tensor containing the queries
+            keys: (N, S, D) The tensor containing the keys
+            values: (N, S, D) The tensor containing the values
+            key_lengths: A fast_transformers.masking.BaseMask implementation
+                         that defines the length of each key/value sequence
+            state: The state varies depending on the inner attention
+                   implementation, but if it is not None then the keys and
+                   values are ignored
+        """
+        if state is None:
+            state = 0
+        
+        value = values[state]
+        
+        state += 1
+
+        return value, state
