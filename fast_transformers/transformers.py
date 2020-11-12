@@ -438,6 +438,9 @@ class TransformerDecoderLayer(Module):
         # Better comptatibility with DistributedDataParallel
         if not self.cross_attention.__class__.__name__ == 'EmptyAttentionLayer':
             y = self.norm2(x)
+        else:
+            y = x
+            
         memory = self.norm2bis(memory)
         x = self.gating2(
             x,

@@ -320,7 +320,8 @@ class RecurrentTransformerDecoderLayer(Module):
         self.linear1 = Linear(d_model, d_ff)
         self.linear2 = Linear(d_ff, d_model)
         self.norm1 = LayerNorm(d_model)
-        self.norm2 = LayerNorm(d_model)
+        if not self.cross_attention.__class__.__name__ == 'RecurrentDiagonalCrossAttentionLayer':
+            self.norm2 = LayerNorm(d_model) 
         self.norm2bis = LayerNorm(d_model)
         self.norm3 = LayerNorm(d_model)
         self.dropout = Dropout(dropout)
@@ -365,7 +366,10 @@ class RecurrentTransformerDecoderLayer(Module):
         x = self.gating1(x, self.dropout(x2))
 
         # Secondly apply the cross attention and add it to the previous output
-        y = self.norm2(x)
+        if not self.cross_attention.__class__.__name__ == 'RecurrentDiagonalCrossAttentionLayer':
+            y = self.norm2(x)
+        else:
+            y = x
         memory = self.norm2bis(memory)
         x2, cross_state = self.cross_attention(
             y, memory, memory, memory_length_mask, state=cross_state

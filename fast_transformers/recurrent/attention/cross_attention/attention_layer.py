@@ -154,7 +154,7 @@ class RecurrentDiagonalCrossAttentionLayer(Module):
         if state is None:
             state = 0
         
-        value = values[state]
+        value = values[:, state]
         
         state += 1
 

@@ -25,6 +25,7 @@ Example
         x, state = att(x, memory, memory, state=state)
 """
 
-from .attention_layer import RecurrentCrossAttentionLayer
+from .attention_layer import RecurrentCrossAttentionLayer, RecurrentDiagonalCrossAttentionLayer
 from .full_attention import RecurrentCrossFullAttention
 from .linear_attention import RecurrentCrossLinearAttention
+from .diagonal_attention import RecurrentDiagonalAttention
