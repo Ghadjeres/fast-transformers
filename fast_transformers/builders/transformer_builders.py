@@ -6,11 +6,11 @@
 """Build complex transformer architectures for inference or training easily."""
 
 from fast_transformers.recurrent.attention.cross_attention.attention_layer import RecurrentDiagonalCrossAttentionLayer
-from fast_transformers.attention.attention_layer import EmptyAttentionLayer
+from fast_transformers.attention.attention_layer import AttentionLayerWithStates, EmptyAttentionLayer, EmptyAttentionLayerWithStates
 from torch.nn import LayerNorm
 
 from ..attention import AttentionLayer
-from ..transformers import TransformerEncoder, TransformerEncoderLayer, \
+from ..transformers import TransformerDecoderLayerWithStates, TransformerDecoderWithStates, TransformerEncoder, TransformerEncoderLayer, \
     TransformerDecoder, TransformerDecoderLayer
 from ..recurrent.attention import \
     RecurrentAttentionLayer, \
@@ -503,6 +503,52 @@ class TransformerDecoderBuilder(BaseTransformerDecoderBuilder):
     def _get_decoder_layer_class(self):
         """Return the transformer decoder layer class."""
         return TransformerDecoderLayer
+    
+class TransformerDiagonalDecoderBuilderWithStates(BaseTransformerDecoderBuilder):
+    """Build a transformer decoder for training or processing of sequences all
+    elements at a time.
+
+    Example usage:
+
+        builder = TransformerDecoderBuilder()
+        builder.n_layers = 12
+        builder.n_heads = 8
+        builder.feed_forward_dimensions = 1024
+        builder.query_dimensions = 64
+        builder.value_dimensions = 64
+        builder.dropout = 0.1
+        builder.attention_dropout = 0.1
+        builder.self_attention_type = "full"
+        builder.cross_attention_type = "full"
+        transformer = builder.get()
+    """
+    def _get_self_attention_builder(self):
+        """Return an attention builder for creating non-recurrent attention
+        variants."""
+        return AttentionBuilder()
+
+    def _get_cross_attention_builder(self):
+        """Return an attention builder for creating non-recurrent attention
+        variants."""
+        return AttentionBuilder()
+
+    def _get_self_attention_layer_class(self):
+        """Return the non-recurrent attention layer to project queries, keys
+        and values."""
+        return AttentionLayerWithStates
+
+    def _get_cross_attention_layer_class(self):
+        """Return the non-recurrent attention layer to project queries, keys
+        and values."""
+        return EmptyAttentionLayerWithStates
+
+    def _get_decoder_class(self):
+        """Return the transformer decoder class."""
+        return TransformerDecoderWithStates
+
+    def _get_decoder_layer_class(self):
+        """Return the transformer decoder layer class."""
+        return TransformerDecoderLayerWithStates
 
 class TransformerDiagonalDecoderBuilder(BaseTransformerDecoderBuilder):
     """Build a transformer decoder for training or processing of sequences all
