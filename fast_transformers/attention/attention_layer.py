@@ -314,5 +314,6 @@ class EmptyAttentionLayerWithStates(Module):
         -------
             The new value for each query as a tensor of shape (N, L, D).
         """
-        state = torch.arange(values.size(1))
+        # the returned state must be updated!
+        state = torch.arange(1, values.size(1) + 1)
         return values, state
