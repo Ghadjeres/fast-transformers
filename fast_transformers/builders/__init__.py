@@ -64,4 +64,4 @@ from .transformer_builders import \
     TransformerEncoderBuilder, \
     RecurrentEncoderBuilder, \
     TransformerDecoderBuilder, \
-    RecurrentDecoderBuilder, RecurrentDiagonalDecoderBuilder, TransformerDiagonalDecoderBuilder
+    RecurrentDecoderBuilder, RecurrentDiagonalDecoderBuilder, TransformerDiagonalDecoderBuilder, TransformerEncoderWithStates

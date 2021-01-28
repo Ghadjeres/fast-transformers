@@ -98,6 +98,87 @@ class TransformerEncoderLayer(Module):
 
         x = self.gating2(x, y)
         return x
+    
+class TransformerEncoderLayerWithStates(Module):
+    """Self attention and feed forward network with skip connections.
+
+    This transformer encoder layer implements the same encoder layer as
+    PyTorch but is a bit more open for extension by receiving the attention
+    implementation as a constructor argument.
+
+    Arguments
+    ---------
+        attention: The attention implementation to use given as a nn.Module
+        d_model: The input feature dimensionality
+        n_heads: The number of heads for the multi head attention
+        d_ff: The dimensionality of the intermediate features after the
+              attention (default: d_model*4)
+        dropout: The dropout rate to apply to the intermediate features
+                 (default: 0.1)
+        activation: {'relu', 'gelu'} Which activation to use for the feed
+                    forward part of the layer (default: relu)
+    """
+    def __init__(self,
+                 attention,
+                 d_model,
+                 d_ff=None,
+                 dropout=0.1,
+                 activation="relu",
+                 event_dispatcher=""):
+        super(TransformerEncoderLayerWithStates, self).__init__()
+        d_ff = d_ff or 4 * d_model
+        self.attention = attention
+        self.linear1 = Linear(d_model, d_ff)
+        self.linear2 = Linear(d_ff, d_model)
+        self.norm1 = LayerNorm(d_model)
+        self.norm2 = LayerNorm(d_model)
+        self.dropout = Dropout(dropout)
+        self.activation = F.relu if activation == "relu" else F.gelu
+        self.gating1 = GRUGate(d_model)
+        self.gating2 = GRUGate(d_model)
+        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
+
+    def forward(self, x, attn_mask=None, length_mask=None):
+        """Apply the transformer encoder to the input x.
+
+        Arguments
+        ---------
+            x: The input features of shape (N, L, E) where N is the batch size,
+               L is the sequence length (padded) and E is d_model passed in the
+               constructor.
+            attn_mask: An implementation of fast_transformers.masking.BaseMask
+                       that encodes where each element of x can attend to.
+            length_mask: An implementation of
+                         fast_transformers.masking.BaseMask that encodes how
+                         many elements each sequence in the batch consists of.
+        """
+        # Normalize the masks
+        N = x.shape[0]
+        L = x.shape[1]
+        attn_mask = attn_mask or FullMask(L, device=x.device)
+        length_mask = length_mask or \
+                      LengthMask(x.new_full((N,), L, dtype=torch.int64))
+
+        # Run self attention and add it to the input
+        y = self.norm1(x)
+        x2, self_state = self.attention(y,
+                               y,
+                               y,
+                               attn_mask=attn_mask,
+                               query_lengths=length_mask,
+                               key_lengths=length_mask)
+        x = self.gating1(
+            x,
+            self.dropout(x2
+                ))
+
+        # Run the fully connected part of the layer
+        y = self.norm2(x)
+        y = self.dropout(self.activation(self.linear1(y)))
+        y = self.dropout(self.linear2(y))
+
+        x = self.gating2(x, y)
+        return x, self_state
 
 
 # class TransformerEncoderLayer(Module):
@@ -225,6 +306,50 @@ class TransformerEncoder(Module):
             x = self.norm(x)
 
         return x
+    
+class TransformerEncoderWithStates(Module):
+    """Same as TransformerEncoder but returns states.
+    Must be used with ...LayerWithStates
+    """
+    def __init__(self, layers, norm_layer=None, event_dispatcher=""):
+        super(TransformerEncoderWithStates, self).__init__()
+        self.layers = ModuleList(layers)
+        self.norm = norm_layer
+        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
+
+    def forward(self, x, attn_mask=None, length_mask=None):
+        """Apply all transformer encoder layers to the input x.
+
+        Arguments
+        ---------
+            x: The input features of shape (N, L, E) where N is the batch size,
+               L is the sequence length (padded) and E is d_model passed in the
+               constructor of each transformer encoder layer.
+            attn_mask: An implementation of fast_transformers.masking.BaseMask
+                       that encodes where each element of x can attend to.
+            length_mask: An implementation of
+                         fast_transformers.masking.BaseMask that encodes how
+                         many elements each sequence in the batch consists of.
+            
+        """
+        # Normalize the masks
+        N = x.shape[0]
+        L = x.shape[1]
+        attn_mask = attn_mask or FullMask(L, device=x.device)
+        length_mask = length_mask or \
+            LengthMask(x.new_full((N,), L, dtype=torch.int64))
+
+        # Apply all the transformers
+        states = []
+        for layer in self.layers:
+            x, s = layer(x, attn_mask=attn_mask, length_mask=length_mask)
+            states.append(s)
+
+        # Apply the normalization if needed
+        if self.norm is not None:
+            x = self.norm(x)
+
+        return x, states
 
 
 # class TransformerDecoderLayer(Module):
