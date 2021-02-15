@@ -175,8 +175,15 @@ class CausalLinearAttentionWithStates(Module):
         )
         
         
+        # If we want to return ALL states
         Sis = torch.einsum('nlhi,nlhj->nlhij', K, values).cumsum(1)
         Zis = K.cumsum(1)
+        
+        # If we return only the last state:
+        # Sis = 0
+        # for i in range(K.size(1)):
+        #     Sis = Sis + torch.einsum('nhi,nhj->nhij', K[:, i], values[:, i])
+        # Zis = K.cumsum(1)[:, -1]
         
         
 
